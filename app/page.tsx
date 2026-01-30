@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useAccount } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Confetti } from '@/components/Confetti';
 import {
   Badge,
@@ -42,6 +44,7 @@ function HomePageLoading() {
 // Main content component that uses useSearchParams
 function HomePageContent() {
   const searchParams = useSearchParams();
+  const { address: connectedAddress, isConnected } = useAccount();
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -49,6 +52,14 @@ function HomePageContent() {
   const [showConfetti, setShowConfetti] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+
+  // Check my own vibe (when wallet connected)
+  const checkMyVibe = () => {
+    if (connectedAddress) {
+      setAddress(connectedAddress);
+      checkVibe(connectedAddress);
+    }
+  };
 
   const checkVibe = async (addressToCheck?: string) => {
     const input = addressToCheck || address;
@@ -137,23 +148,89 @@ function HomePageContent() {
 
       {/* Navigation */}
       <nav className="border-b border-white/10 bg-black/20 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-2xl">✨</span>
             <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
               Vibe Check
             </span>
           </Link>
-          <div className="flex gap-6">
-            <Link href="/" className="text-white font-medium">
+          <div className="flex items-center gap-6">
+            <Link href="/" className="text-white font-medium hidden sm:block">
               Home
             </Link>
-            <Link href="/how-it-works" className="text-gray-400 hover:text-white transition-colors">
+            <Link href="/how-it-works" className="text-gray-400 hover:text-white transition-colors hidden sm:block">
               How It Works
             </Link>
-            <Link href="/blog" className="text-gray-400 hover:text-white transition-colors">
+            <Link href="/blog" className="text-gray-400 hover:text-white transition-colors hidden sm:block">
               Blog
             </Link>
+            <ConnectButton.Custom>
+              {({
+                account,
+                chain,
+                openAccountModal,
+                openChainModal,
+                openConnectModal,
+                mounted,
+              }) => {
+                const ready = mounted;
+                const connected = ready && account && chain;
+
+                return (
+                  <div
+                    {...(!ready && {
+                      'aria-hidden': true,
+                      style: {
+                        opacity: 0,
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                      },
+                    })}
+                  >
+                    {(() => {
+                      if (!connected) {
+                        return (
+                          <button
+                            onClick={openConnectModal}
+                            className="px-4 py-2 bg-gradient-to-r from-base-blue to-blue-600 rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
+                          >
+                            Connect Wallet
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={openChainModal}
+                            className="flex items-center gap-1 px-3 py-2 bg-gray-800/60 rounded-xl text-sm hover:bg-gray-700/60 transition-colors"
+                          >
+                            {chain.hasIcon && (
+                              <div className="w-4 h-4">
+                                {chain.iconUrl && (
+                                  <img
+                                    alt={chain.name ?? 'Chain icon'}
+                                    src={chain.iconUrl}
+                                    className="w-4 h-4 rounded-full"
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </button>
+                          <button
+                            onClick={openAccountModal}
+                            className="px-3 py-2 bg-gray-800/60 rounded-xl text-sm font-mono hover:bg-gray-700/60 transition-colors"
+                          >
+                            {account.displayName}
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              }}
+            </ConnectButton.Custom>
           </div>
         </div>
       </nav>
@@ -204,6 +281,23 @@ function HomePageContent() {
               </div>
             </div>
             {error && <p className="mt-3 text-red-400 text-sm text-center">{error}</p>}
+            
+            {/* Check My Vibe - shown when wallet connected */}
+            {isConnected && connectedAddress && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  onClick={checkMyVibe}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 border border-purple-500/30 hover:border-purple-500/50 rounded-xl font-medium text-sm transition-all disabled:opacity-50"
+                >
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                  Check My Vibe
+                  <span className="text-gray-400 font-mono text-xs">
+                    ({connectedAddress.slice(0, 6)}...{connectedAddress.slice(-4)})
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
 
           {loading && <ResultsSkeleton />}
