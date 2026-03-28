@@ -1,4 +1,4 @@
-import { createPublicClient, http, getAddress, isAddress, type Hex } from 'viem';
+import { createPublicClient, http, fallback, getAddress, isAddress, type Hex } from 'viem';
 import { mainnet, base } from 'viem/chains';
 import { normalize } from 'viem/ens';
 import { getEthosProfile } from '@/lib/ethos';
@@ -13,18 +13,21 @@ import type { ReputationResult, ContractInfo, OnChainData } from '@/types';
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 
+// Primary client with fallback transport for ENS resolution reliability
 const mainnetClient = createPublicClient({
   chain: mainnet,
-  transport: http('https://cloudflare-eth.com', {
-    timeout: 10_000,
-    retryCount: 2,
-  }),
+  transport: fallback([
+    http('https://eth.drpc.org', { timeout: 15_000 }),
+    http('https://cloudflare-eth.com', { timeout: 15_000 }),
+    http('https://1rpc.io/eth', { timeout: 15_000 }),
+    http('https://rpc.ankr.com/eth', { timeout: 15_000 }),
+  ]),
 });
 
 const mainnetClientBackup = createPublicClient({
   chain: mainnet,
   transport: http('https://eth.llamarpc.com', {
-    timeout: 10_000,
+    timeout: 15_000,
     retryCount: 1,
   }),
 });
