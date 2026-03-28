@@ -28,6 +28,6 @@ const comparison = await client.compare('vitalik.eth', 'paradigm.eth');
 
 ## Options
 
-- `baseUrl` - API base URL (default: `https://vibecheck.base.org`)
+- `baseUrl` - API base URL (default: `https://vibecheck.gudman.xyz`)
 - `apiKey` - API key for higher rate limits
 - `timeout` - Request timeout in ms (default: 30000)
