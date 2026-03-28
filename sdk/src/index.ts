@@ -144,7 +144,7 @@ export class VibeCheckError extends Error {
 
 // Client
 
-const DEFAULT_BASE_URL = 'https://vibecheck.base.org';
+const DEFAULT_BASE_URL = 'https://vibecheck.gudman.xyz';
 const DEFAULT_TIMEOUT = 30000;
 
 export class VibeCheck {
