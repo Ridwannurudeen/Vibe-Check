@@ -305,17 +305,12 @@ async function detectAndGetContractInfo(address: string): Promise<ContractInfo> 
     const chainId = detection.detectedChain || 8453;
     const details = await getContractDetails(address, chainId);
 
-    // Smart account heuristic: bytecode exists but Etherscan has no contract creation
-    // data and zero interactions. Real contracts always have a creation tx and at least
-    // some interactions. Smart accounts (EIP-4337/7702) have bytecode but no contract
-    // creation record in Etherscan.
-    const hasNoContractEvidence =
-      !details.creator &&
-      !details.creationTxHash &&
-      (details.interactionCount ?? 0) === 0 &&
-      (details.uniqueUsers ?? 0) === 0;
-
-    if (hasNoContractEvidence) {
+    // Smart account heuristic: bytecode exists but Etherscan has no evidence of a real
+    // contract deployment. Verified contracts are always real. Unverified contracts with
+    // no creation data and no interactions are likely smart accounts (EIP-4337/7702).
+    // Note: Etherscan v2 free tier only supports getsourcecode for Base, so creator/tx
+    // data may be missing even for real contracts — verification status is the key signal.
+    if (!details.isVerified && !details.creator && !details.creationTxHash && !details.contractName) {
       return { isContract: false, isVerified: false, isProxy: false };
     }
 
