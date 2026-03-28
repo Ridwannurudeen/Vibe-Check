@@ -148,6 +148,8 @@ function interpretBytecode(bytecode: Hex | undefined): { hasCode: boolean; raw: 
   if (bytecode === '0x0') return { hasCode: false, raw: '0x0' };
   if (bytecode === '0x00') return { hasCode: false, raw: '0x00' };
   if (bytecode.length <= 2) return { hasCode: false, raw: bytecode };
+  // EIP-7702 delegation designator — address has delegated code but is still an EOA
+  if (bytecode.toLowerCase().startsWith('0xef0100')) return { hasCode: false, raw: 'EIP-7702 delegation' };
   return { hasCode: true, raw: bytecode.slice(0, 20) + '...' };
 }
 
@@ -473,20 +475,27 @@ export async function getReputation(addressOrEns: string): Promise<ReputationRes
     throw new Error('Invalid Ethereum address format');
   }
 
-  // Step 2: Contract detection
-  const contractInfo = await detectAndGetContractInfo(resolvedAddress);
-  const isContract = contractInfo.isContract;
-
-  // Step 3: Known protocol
-  const knownProtocol = getKnownProtocol(resolvedAddress);
-
-  // Step 4: Ethos + on-chain data in parallel
-  const [ethosData, onChainData] = await Promise.all([
+  // Step 2: Contract detection + Ethos + on-chain data in parallel
+  const [contractInfoRaw, ethosData, onChainData] = await Promise.all([
+    detectAndGetContractInfo(resolvedAddress),
     getEthosProfile(resolvedAddress),
     getOnChainData(resolvedAddress),
   ]);
 
-  // Step 4b: Basename reverse lookup (non-blocking)
+  // Step 3: Known protocol
+  const knownProtocol = getKnownProtocol(resolvedAddress);
+
+  // Step 3b: Sanity check — if contract detected but on-chain data shows significant
+  // wallet activity, it's likely a smart account (EIP-7702/4337), not a deployed contract.
+  // Real contracts don't have 100+ outbound txs or years of wallet-like activity.
+  let contractInfo = contractInfoRaw;
+  let isContract = contractInfo.isContract;
+  if (isContract && onChainData.transactionCount > 50 && onChainData.walletAgeDays > 30) {
+    isContract = false;
+    contractInfo = { isContract: false, isVerified: false, isProxy: false };
+  }
+
+  // Step 4: Basename reverse lookup (non-blocking)
   const basename = await resolveBasename(resolvedAddress).catch(() => null);
 
   // Step 5: AI analysis
