@@ -15,7 +15,7 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 
 const mainnetClient = createPublicClient({
   chain: mainnet,
-  transport: http('https://eth.llamarpc.com', {
+  transport: http('https://cloudflare-eth.com', {
     timeout: 10_000,
     retryCount: 2,
   }),
@@ -23,7 +23,7 @@ const mainnetClient = createPublicClient({
 
 const mainnetClientBackup = createPublicClient({
   chain: mainnet,
-  transport: http('https://rpc.ankr.com/eth', {
+  transport: http('https://eth.llamarpc.com', {
     timeout: 10_000,
     retryCount: 1,
   }),
