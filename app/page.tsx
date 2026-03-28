@@ -1,33 +1,71 @@
-'use client';
+import { Suspense } from 'react';
+import type { Metadata } from 'next';
+import { HomePageContent } from '@/components/HomePageContent';
 
-import { useState, useRef, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useAccount } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { Confetti } from '@/components/Confetti';
-import {
-  Badge,
-  BaseLogo,
-  ResultsSkeleton,
-  ScoreGauge,
-  MetricCard,
-  VibeAnalysis,
-  ThumbsUpIcon,
-  ShieldIcon,
-  DollarIcon,
-  BoltIcon,
-  SearchIcon,
-  SpinnerIcon,
-  AnalyticsIcon,
-  ScoreExplainer,
-  ScoreBreakdown,
-  ContractInfoCard,
-  ShareResults,
-  Footer,
-} from '@/components';
-import { isValidAddress, formatWei, getAttestationBadges } from '@/lib/utils';
-import Link from 'next/link';
-import type { CheckVibeResponse } from '@/types';
+interface PageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+function getTierFromScore(score: number): string {
+  if (score >= 2000) return 'Excellent';
+  if (score >= 1600) return 'Good';
+  if (score >= 1200) return 'Neutral';
+  if (score >= 800) return 'Questionable';
+  return 'Risky';
+}
+
+function truncateAddress(address: string): string {
+  if (address.includes('.')) return address;
+  if (address.length <= 14) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const address = typeof params.address === 'string' ? params.address : undefined;
+
+  // Default metadata (no address in URL)
+  if (!address) {
+    return {};
+  }
+
+  // Address-specific OG metadata
+  const displayAddress = truncateAddress(address);
+  const title = `Vibe Check: ${displayAddress}`;
+  const description = `Check the reputation and trust score of ${displayAddress} on Base. Powered by Ethos Network.`;
+
+  // Build the OG image URL with address params
+  // Score and tier will be populated when the share link is crafted with those params
+  const ogSearchParams = new URLSearchParams({ address });
+  const ogImageUrl = `/api/og?${ogSearchParams.toString()}`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `https://vibecheck.base.org/?address=${encodeURIComponent(address)}`,
+      siteName: 'Vibe Check',
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `Vibe Check score for ${displayAddress}`,
+        },
+      ],
+      locale: 'en_US',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [ogImageUrl],
+    },
+  };
+}
 
 // Loading fallback for Suspense
 function HomePageLoading() {
@@ -41,394 +79,6 @@ function HomePageLoading() {
   );
 }
 
-// Main content component that uses useSearchParams
-function HomePageContent() {
-  const searchParams = useSearchParams();
-  const { address: connectedAddress, isConnected } = useAccount();
-  const [address, setAddress] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState<CheckVibeResponse | null>(null);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
-
-  // Check my own vibe (when wallet connected)
-  const checkMyVibe = () => {
-    if (connectedAddress) {
-      setAddress(connectedAddress);
-      checkVibe(connectedAddress);
-    }
-  };
-
-  const checkVibe = async (addressToCheck?: string) => {
-    const input = addressToCheck || address;
-    if (!input.trim()) {
-      setError('Please enter a Base wallet address, ENS name, or contract address');
-      return;
-    }
-
-    const trimmedInput = input.trim();
-    const looksLikeENS =
-      trimmedInput.includes('.') &&
-      (trimmedInput.endsWith('.eth') ||
-        trimmedInput.endsWith('.xyz') ||
-        trimmedInput.endsWith('.base.eth') ||
-        trimmedInput.endsWith('.cb.id'));
-
-    if (!looksLikeENS && !isValidAddress(trimmedInput)) {
-      setError('Invalid Ethereum address or ENS name');
-      return;
-    }
-
-    setError('');
-    setLoading(true);
-    setResult(null);
-
-    try {
-      const res = await fetch('/api/check-vibe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: trimmedInput }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to analyze address');
-      }
-
-      const data: CheckVibeResponse = await res.json();
-      setResult(data);
-
-      if (data.ethosData.score >= 2000) {
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 3000);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Check for URL parameter on mount
-  useEffect(() => {
-    const addressParam = searchParams.get('address');
-    if (addressParam && !initialCheckDone) {
-      setAddress(addressParam);
-      setInitialCheckDone(true);
-      // Small delay to ensure state is set
-      setTimeout(() => checkVibe(addressParam), 100);
-    }
-  }, [searchParams, initialCheckDone]);
-
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') checkVibe();
-  };
-
-  const tryExample = () => {
-    const addr = 'paradigm.eth';
-    setAddress(addr);
-    checkVibe(addr);
-  };
-
-  const tryContractExample = () => {
-    // USDC on Base
-    const addr = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-    setAddress(addr);
-    checkVibe(addr);
-  };
-
-  // Check if this is a contract
-  const isContract = result?.contractInfo?.isContract ?? false;
-
-  return (
-    <div className="min-h-screen bg-base-dark text-white overflow-hidden flex flex-col">
-      <Confetti trigger={showConfetti} />
-
-      {/* Navigation */}
-      <nav className="border-b border-white/10 bg-black/20 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl">✨</span>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Vibe Check
-            </span>
-          </Link>
-          <div className="flex items-center gap-6">
-            <Link href="/" className="text-white font-medium hidden sm:block">
-              Home
-            </Link>
-            <Link href="/how-it-works" className="text-gray-400 hover:text-white transition-colors hidden sm:block">
-              How It Works
-            </Link>
-            <Link href="/blog" className="text-gray-400 hover:text-white transition-colors hidden sm:block">
-              Blog
-            </Link>
-            <ConnectButton.Custom>
-              {({
-                account,
-                chain,
-                openAccountModal,
-                openChainModal,
-                openConnectModal,
-                mounted,
-              }) => {
-                const ready = mounted;
-                const connected = ready && account && chain;
-
-                return (
-                  <div
-                    {...(!ready && {
-                      'aria-hidden': true,
-                      style: {
-                        opacity: 0,
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                      },
-                    })}
-                  >
-                    {(() => {
-                      if (!connected) {
-                        return (
-                          <button
-                            onClick={openConnectModal}
-                            className="px-4 py-2 bg-gradient-to-r from-base-blue to-blue-600 rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
-                          >
-                            Connect Wallet
-                          </button>
-                        );
-                      }
-
-                      return (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={openChainModal}
-                            className="flex items-center gap-1 px-3 py-2 bg-gray-800/60 rounded-xl text-sm hover:bg-gray-700/60 transition-colors"
-                          >
-                            {chain.hasIcon && (
-                              <div className="w-4 h-4">
-                                {chain.iconUrl && (
-                                  <img
-                                    alt={chain.name ?? 'Chain icon'}
-                                    src={chain.iconUrl}
-                                    className="w-4 h-4 rounded-full"
-                                  />
-                                )}
-                              </div>
-                            )}
-                          </button>
-                          <button
-                            onClick={openAccountModal}
-                            className="px-3 py-2 bg-gray-800/60 rounded-xl text-sm font-mono hover:bg-gray-700/60 transition-colors"
-                          >
-                            {account.displayName}
-                          </button>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                );
-              }}
-            </ConnectButton.Custom>
-          </div>
-        </div>
-      </nav>
-
-      <main className="flex-1">
-        <div className="max-w-2xl mx-auto px-4 py-12">
-          {/* Header */}
-          <header className="text-center mb-12">
-            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-base-blue/10 border border-base-blue/20 mb-6">
-              <BaseLogo size={20} />
-              <span className="text-xs text-gray-400 uppercase tracking-wider">
-                Built on Base • Powered by Ethos Network
-              </span>
-            </div>
-
-            <h1 className="text-5xl font-bold mb-4 gradient-text">Vibe Check</h1>
-            <p className="text-gray-400">
-              Instant trust & reputation analysis for wallets and contracts on Base
-            </p>
-          </header>
-
-          {/* Input */}
-          <div className="mb-8">
-            <div className="bg-gray-900/80 rounded-2xl border border-base-blue/30 p-2">
-              <div className="flex gap-2">
-                <input
-                  ref={inputRef}
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder="0x… wallet, contract, or ENS name"
-                  className="flex-1 bg-gray-800/50 rounded-xl px-5 py-4 font-mono text-sm outline-none"
-                />
-                <button
-                  onClick={() => checkVibe()}
-                  disabled={loading}
-                  className="px-8 py-4 bg-gradient-to-r from-base-blue to-blue-600 rounded-xl font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <SpinnerIcon size={18} />
-                      Checking…
-                    </span>
-                  ) : (
-                    'Check Vibe'
-                  )}
-                </button>
-              </div>
-            </div>
-            {error && <p className="mt-3 text-red-400 text-sm text-center">{error}</p>}
-            
-            {/* Check My Vibe - shown when wallet connected */}
-            {isConnected && connectedAddress && (
-              <div className="mt-4 flex justify-center">
-                <button
-                  onClick={checkMyVibe}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 border border-purple-500/30 hover:border-purple-500/50 rounded-xl font-medium text-sm transition-all disabled:opacity-50"
-                >
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                  Check My Vibe
-                  <span className="text-gray-400 font-mono text-xs">
-                    ({connectedAddress.slice(0, 6)}...{connectedAddress.slice(-4)})
-                  </span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {loading && <ResultsSkeleton />}
-
-          {/* RESULTS — FULLY GUARDED */}
-          {result && result.ethosData && (
-            <div className="space-y-6">
-              
-              {/* Contract Badge (if applicable) */}
-              {isContract && (
-                <div className="flex justify-center">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/15 border border-indigo-500/30">
-                    <svg className="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14,2 14,8 20,8"/>
-                    </svg>
-                    <span className="text-sm text-indigo-400 font-medium">Smart Contract Detected</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Score */}
-              <div className="bg-gray-900/40 rounded-3xl p-8 border border-base-blue/20">
-                <ScoreGauge score={result.ethosData.score} />
-              </div>
-
-              {/* SAFE EXPLANATION */}
-              <ScoreExplainer score={result.ethosData.score} />
-
-              {/* Contract Info Card (if it's a contract) */}
-              {isContract && result.contractInfo && (
-                <ContractInfoCard contractInfo={result.contractInfo} />
-              )}
-            
-              {/* Score Breakdown (for wallets) - only show full breakdown for EOA */}
-              {!isContract && (
-                <ScoreBreakdown data={result.ethosData} onChainData={result.onChainData} />
-              )}
-
-              {/* Metrics */}
-              <div className="grid grid-cols-2 gap-4">
-              <MetricCard
-                icon={<ThumbsUpIcon />}
-                label="Reviews"
-                value={`+${result.ethosData.stats.review.received.positive} / -${result.ethosData.stats.review.received.negative}`}
-                subtext={`${result.ethosData.stats.review.received.neutral} neutral`}
-                delay={0}
-              />
-              <MetricCard
-                icon={<ShieldIcon />}
-                label="Vouches Received"
-                value={result.ethosData.stats.vouch.received.count}
-                subtext={formatWei(result.ethosData.stats.vouch.received.amountWeiTotal)}
-                delay={100}
-              />
-              <MetricCard
-                icon={<DollarIcon />}
-                label="Vouches Given"
-                value={result.ethosData.stats.vouch.given.count}
-                subtext={formatWei(result.ethosData.stats.vouch.given.amountWeiTotal)}
-                delay={200}
-              />
-              <MetricCard
-                icon={<BoltIcon />}
-                label="XP"
-                value={result.ethosData.xpTotal.toLocaleString()}
-                subtext={
-                  result.ethosData.xpStreakDays
-                    ? `${result.ethosData.xpStreakDays} day streak`
-                    : undefined
-                }
-                delay={300}
-              />
-            </div>
-
-            {/* AI */}
-            <div className="bg-gray-900/40 rounded-2xl p-6 border border-base-blue/20">
-              <div className="flex items-center gap-3 mb-4">
-                <AnalyticsIcon />
-                <h3 className="font-semibold">
-                  {isContract ? 'Contract Analysis' : 'Vibe Check Analysis'}
-                </h3>
-              </div>
-              <VibeAnalysis analysis={result.aiAnalysis} />
-            </div>
-
-            {/* Social Sharing - Uses Ethos as identity source */}
-            <ShareResults 
-              address={address}
-              score={result.ethosData.score}
-              summary={result.aiAnalysis.oneWordSummary}
-              isContract={isContract}
-              contractName={result.contractInfo?.contractName}
-              knownProtocol={result.knownProtocol?.name}
-              ethosData={result.ethosData}
-            />
-            </div>
-          )}
-
-          {/* Empty State */}
-          {!loading && !result && (
-            <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">Try an example</p>
-              <div className="flex justify-center gap-4">
-                <button 
-                  onClick={tryExample} 
-                  className="text-base-blue font-mono hover:underline"
-                >
-                  paradigm.eth
-                </button>
-                <span className="text-gray-600">|</span>
-                <button 
-                  onClick={tryContractExample} 
-                  className="text-indigo-400 font-mono hover:underline"
-                  title="USDC on Base"
-                >
-                  USDC Contract
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Footer */}
-      <Footer />
-    </div>
-  );
-}
-
-// Default export with Suspense boundary (required for useSearchParams)
 export default function HomePage() {
   return (
     <Suspense fallback={<HomePageLoading />}>

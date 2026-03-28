@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { BaseLogo } from '@/components/ui/base-logo';
 import type { EthosUser } from '@/types';
 
 interface ShareResultsProps {
@@ -11,6 +12,7 @@ interface ShareResultsProps {
   contractName?: string;
   knownProtocol?: string;
   ethosData: EthosUser;
+  basename?: string;
 }
 
 // Score emoji based on score range
@@ -31,14 +33,15 @@ function getVibeText(score: number): string {
   return 'Risky';
 }
 
-export function ShareResults({ 
-  address, 
-  score, 
-  summary, 
-  isContract, 
+export function ShareResults({
+  address,
+  score,
+  summary,
+  isContract,
   contractName,
   knownProtocol,
   ethosData,
+  basename,
 }: ShareResultsProps) {
   const [copied, setCopied] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -65,17 +68,29 @@ export function ShareResults({
   const vibeText = getVibeText(score);
   
   // Include Ethos attribution in share text
-  const identityNote = hasEthosProfile 
+  const identityNote = hasEthosProfile
     ? `\n🔗 Identity linked via @EthosNetwork`
     : '';
-  
+
+  const basenameNote = basename
+    ? `\n🔵 Basename: ${basename}`
+    : '';
+
   const shareText = isContract
     ? `${emoji} Vibe Check: ${addressLabel}\n\nScore: ${score}/2800 (${vibeText})\nType: Smart Contract\n\nCheck any wallet or contract on Base 👇`
-    : `${emoji} Vibe Check: ${addressLabel}\n\nScore: ${score}/2800 (${vibeText})\nSummary: ${summary}${identityNote}\n\nCheck your wallet's vibe 👇`;
+    : `${emoji} Vibe Check: ${addressLabel}\n\nScore: ${score}/2800 (${vibeText})\nSummary: ${summary}${basenameNote}${identityNote}\n\nCheck your wallet's vibe 👇`;
 
-  const shareUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/?address=${encodeURIComponent(address)}`
-    : `https://vibecheck.base.org/?address=${encodeURIComponent(address)}`;
+  // Share URL points to the page (which has generateMetadata that sets OG image)
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://vibecheck.base.org';
+  const shareUrl = `${baseUrl}/?address=${encodeURIComponent(address)}`;
+
+  // Build the full OG image URL for direct use (e.g. embedding in forums)
+  const ogImageUrl = `${baseUrl}/api/og?${new URLSearchParams({
+    address,
+    score: String(score),
+    tier: vibeText.toLowerCase(),
+    ...(isContract ? { contract: 'true' } : {}),
+  }).toString()}`;
 
   // Twitter/X share
   const handleTwitterShare = () => {
@@ -135,6 +150,12 @@ export function ShareResults({
           )}
           
           <div className="flex-1 min-w-0">
+            {basename && (
+              <div className="flex items-center gap-1.5 mb-1">
+                <BaseLogo size={14} />
+                <span className="text-base-blue font-mono text-sm">{basename}</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <p className="font-medium text-sm truncate">{addressLabel}</p>
               {hasEthosProfile && (

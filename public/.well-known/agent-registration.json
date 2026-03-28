@@ -1,0 +1,42 @@
+{
+  "name": "Vibe Check",
+  "description": "Composable reputation infrastructure for Base and Ethos ecosystems. Instant trust and reputation analysis for wallets and smart contracts.",
+  "version": "1.0.0",
+  "capabilities": ["reputation-analysis", "sybil-detection", "wallet-comparison", "historical-tracking", "on-chain-attestations"],
+  "services": [
+    {
+      "type": "web",
+      "url": "https://vibecheck.base.org",
+      "description": "Web interface for wallet and contract reputation analysis"
+    },
+    {
+      "type": "rest-api",
+      "url": "https://vibecheck.base.org/api/v1",
+      "description": "Public REST API for reputation data",
+      "endpoints": [
+        {
+          "path": "/reputation/{address}",
+          "method": "GET",
+          "description": "Get full reputation analysis for an address"
+        },
+        {
+          "path": "/history/{address}",
+          "method": "GET",
+          "description": "Get historical score snapshots for an address"
+        }
+      ]
+    },
+    {
+      "type": "mcp",
+      "url": "https://vibecheck.base.org/mcp/sse",
+      "description": "MCP server with reputation tools and resources",
+      "tools": ["check_reputation", "compare_wallets", "get_history"],
+      "resources": ["reputation://{address}"]
+    }
+  ],
+  "chains": [8453, 1],
+  "protocols": ["ethos-network", "eas"],
+  "contact": {
+    "website": "https://vibecheck.base.org"
+  }
+}

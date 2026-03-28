@@ -56,6 +56,7 @@ export interface ContractInfo {
   };
   interactionCount?: number;
   uniqueUsers?: number;
+  detectedChain?: number;
 }
 
 export interface EthosUser {
@@ -105,6 +106,50 @@ export interface CheckVibeResponse {
   knownProtocol?: KnownProtocol;
   aiAnalysis: VibeAnalysis;
   timestamp: string;
+  basename?: string;
+}
+
+// Full reputation result from getReputation()
+export interface ReputationResult {
+  ethosData: EthosUser;
+  onChainData: OnChainData;
+  contractInfo?: ContractInfo;
+  knownProtocol?: KnownProtocol;
+  aiAnalysis: VibeAnalysis;
+  address: string;
+  inputAddress: string;
+  timestamp: string;
+  sybilRisk?: SybilRisk;
+  basename?: string;
+}
+
+// Sybil risk assessment
+export interface SybilRisk {
+  score: number; // 0-100
+  level: 'low' | 'medium' | 'high';
+  indicators: SybilIndicator[];
+}
+
+export interface SybilIndicator {
+  name: string;
+  triggered: boolean;
+  description: string;
+  weight: number;
+}
+
+// Historical tracking
+export interface ScoreSnapshot {
+  score: number;
+  tier: string;
+  transactionCount: number;
+  timestamp: number;
+}
+
+export interface HistoryResponse {
+  address: string;
+  snapshots: ScoreSnapshot[];
+  firstSeen: number | null;
+  lastSeen: number | null;
 }
 
 export interface CheckVibeError {

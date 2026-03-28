@@ -1,0 +1,19 @@
+{
+  "name": "@vibe-check/sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for the Vibe Check reputation API",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "keywords": ["reputation", "base", "ethos", "wallet", "blockchain", "web3"],
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}
