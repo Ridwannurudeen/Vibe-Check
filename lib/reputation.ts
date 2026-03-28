@@ -305,6 +305,20 @@ async function detectAndGetContractInfo(address: string): Promise<ContractInfo> 
     const chainId = detection.detectedChain || 8453;
     const details = await getContractDetails(address, chainId);
 
+    // Smart account heuristic: bytecode exists but Etherscan has no contract creation
+    // data and zero interactions. Real contracts always have a creation tx and at least
+    // some interactions. Smart accounts (EIP-4337/7702) have bytecode but no contract
+    // creation record in Etherscan.
+    const hasNoContractEvidence =
+      !details.creator &&
+      !details.creationTxHash &&
+      (details.interactionCount ?? 0) === 0 &&
+      (details.uniqueUsers ?? 0) === 0;
+
+    if (hasNoContractEvidence) {
+      return { isContract: false, isVerified: false, isProxy: false };
+    }
+
     return {
       isContract: true,
       isVerified: details.isVerified ?? false,
@@ -485,15 +499,8 @@ export async function getReputation(addressOrEns: string): Promise<ReputationRes
   // Step 3: Known protocol
   const knownProtocol = getKnownProtocol(resolvedAddress);
 
-  // Step 3b: Sanity check — if contract detected but on-chain data shows significant
-  // wallet activity, it's likely a smart account (EIP-7702/4337), not a deployed contract.
-  // Real contracts don't have 100+ outbound txs or years of wallet-like activity.
-  let contractInfo = contractInfoRaw;
-  let isContract = contractInfo.isContract;
-  if (isContract && onChainData.transactionCount > 50 && onChainData.walletAgeDays > 30) {
-    isContract = false;
-    contractInfo = { isContract: false, isVerified: false, isProxy: false };
-  }
+  const contractInfo = contractInfoRaw;
+  const isContract = contractInfo.isContract;
 
   // Step 4: Basename reverse lookup (non-blocking)
   const basename = await resolveBasename(resolvedAddress).catch(() => null);
